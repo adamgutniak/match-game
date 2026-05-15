@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>MATCH — A Pairing Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --ink: #111111;
+  --ink-soft: #2a2a2a;
+  --muted: #9a9a98;
+  --line: #ececea;
+  --line-soft: #f4f4f1;
+  --x: #ef4444;
+  --o: #0d9488;
+  --complete: #fef9c3;
+  --complete-line: #fde68a;
+  --win: #fbbf24;
+  --shadow-sm: 0 1px 2px rgba(17,17,17,0.04), 0 1px 1px rgba(17,17,17,0.03);
+  --shadow-md: 0 4px 16px rgba(17,17,17,0.06), 0 1px 4px rgba(17,17,17,0.04);
+  --shadow-lg: 0 12px 40px rgba(17,17,17,0.10), 0 4px 12px rgba(17,17,17,0.06);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --r-sm: 8px; --r-md: 12px; --r-lg: 18px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  height: 100%; background: var(--bg); color: var(--ink);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-weight: 400; -webkit-font-smoothing: antialiased; overflow-x: hidden;
+}
+body { display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+
+header { width: 100%; max-width: 460px; padding: 32px 20px 18px; text-align: center; }
+.logo { font-size: clamp(22px, 6vw, 28px); font-weight: 600; letter-spacing: 8px; color: var(--ink); }
+.tagline { margin-top: 6px; font-size: 10px; color: var(--muted); letter-spacing: 2.5px; text-transform: uppercase; }
+
+#scorebar { display: flex; width: 100%; max-width: 460px; padding: 12px 20px 0; gap: 10px; }
+.scard { flex: 1; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); transition: all 200ms var(--ease); position: relative; }
+.scard::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-md); pointer-events: none; box-shadow: 0 0 0 0 transparent; transition: box-shadow 240ms var(--ease); }
+.scard.active-p1 { border-color: rgba(239,68,68,0.35); }
+.scard.active-p1::after { box-shadow: 0 0 0 3px rgba(239,68,68,0.10); }
+.scard.active-p2 { border-color: rgba(13,148,136,0.35); }
+.scard.active-p2::after { box-shadow: 0 0 0 3px rgba(13,148,136,0.10); }
+.slabel { font-size: 9px; letter-spacing: 1.8px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 500; }
+.srow { display: flex; align-items: center; justify-content: space-between; }
+.ssymbol { font-size: 18px; font-weight: 600; color: var(--muted); transition: color 200ms var(--ease); }
+.scard.active-p1 .ssymbol { color: var(--x); }
+.scard.active-p2 .ssymbol { color: var(--o); }
+.sval { font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: -0.5px; }
+
+#online-bar { display: none; width: 100%; max-width: 460px; padding: 10px 20px 0; text-align: center; font-size: 11px; color: var(--muted); gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+#online-bar.show { display: flex; }
+#online-bar strong { color: var(--ink); }
+.turn-pill { padding: 2px 10px; border-radius: 99px; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; background: var(--complete); color: var(--ink); transition: all 200ms; }
+.turn-pill.waiting { background: var(--line-soft); color: var(--muted); }
+
+#status-wrap { width: 100%; max-width: 460px; padding: 22px 20px 4px; }
+#status { font-size: clamp(15px, 4vw, 17px); letter-spacing: 0.3px; font-weight: 500; color: var(--ink); }
+#hint { margin-top: 4px; font-size: 12px; color: var(--muted); min-height: 18px; line-height: 1.5; }
+
+#board-wrap { position: relative; width: min(460px, 100vw); padding: 14px 20px 18px; }
+#grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 6px; aspect-ratio: 1; background: var(--surface); border-radius: var(--r-lg); padding: 10px; box-shadow: var(--shadow-md); }
+.cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; background: var(--line-soft); border-radius: var(--r-sm); position: relative; user-select: none; -webkit-user-select: none; transition: background 180ms var(--ease), transform 180ms var(--ease); }
+.cell:hover:not(.done):not(.blocked) { background: #ecece8; }
+.cell:active:not(.done):not(.blocked) { transform: scale(0.96); }
+.cell.done { cursor: default; background: var(--complete); box-shadow: inset 0 0 0 1px var(--complete-line); }
+.cell.blocked { cursor: default; }
+.cell.win-cell { background: var(--win) !important; box-shadow: inset 0 0 0 1px rgba(180,120,0,0.3) !important; }
+.cell.btn-target { background: #fffbeb !important; box-shadow: inset 0 0 0 1.5px var(--complete-line) !important; }
+.cell svg { transition: opacity 180ms var(--ease); }
+
+#center-btn-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; }
+#center-btn { width: clamp(44px,11vw,54px); height: clamp(44px,11vw,54px); border-radius: 50%; border: 1px solid var(--line); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px var(--bg), var(--shadow-sm); color: var(--muted); transition: all 220ms var(--ease); padding: 0; }
+#center-btn-wrap > #center-btn:hover:not(:disabled) { transform: scale(1.05); }
+#center-btn:disabled { cursor: not-allowed; opacity: 0.55; }
+#center-btn.done { background: var(--complete); border-color: var(--complete-line); cursor: default; opacity: 1; }
+#center-btn.locked { border-style: dashed; border-color: var(--muted); opacity: 0.45; cursor: not-allowed; }
+#center-btn.ready { background: var(--win); border-color: var(--win); color: #fff; box-shadow: 0 0 0 4px var(--bg), 0 4px 14px rgba(251,191,36,0.45); animation: gentlePulse 1.6s ease-in-out infinite; opacity: 1; }
+@keyframes gentlePulse {
+  0%,100% { box-shadow: 0 0 0 4px var(--bg), 0 4px 14px rgba(251,191,36,0.45); }
+  50%      { box-shadow: 0 0 0 4px var(--bg), 0 4px 22px rgba(251,191,36,0.65); }
+}
+
+#footer { width: 100%; max-width: 460px; padding: 6px 20px 28px; display: flex; gap: 10px; }
+.btn { padding: 12px 16px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); font-family: inherit; font-size: 12px; font-weight: 500; letter-spacing: 0.4px; cursor: pointer; border-radius: var(--r-sm); transition: all 180ms var(--ease); }
+.btn:hover { border-color: var(--ink-soft); color: var(--ink); }
+.btn:active { transform: scale(0.98); }
+#reset { flex: 1; }
+
+#rules-panel { width: 100%; max-width: 460px; margin: 0 20px 24px; padding: 18px 20px; border: 1px solid var(--line); background: var(--surface); display: none; border-radius: var(--r-md); }
+#rules-panel.open { display: block; }
+#rules-panel h3 { font-size: 11px; font-weight: 600; letter-spacing: 2px; margin-bottom: 14px; text-transform: uppercase; color: var(--muted); }
+#rules-panel ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+#rules-panel li { font-size: 13px; line-height: 1.6; padding-left: 14px; position: relative; color: var(--ink-soft); }
+#rules-panel li::before { content: '·'; position: absolute; left: 0; color: var(--muted); font-size: 18px; line-height: 1; top: 1px; }
+#rules-panel li strong { font-weight: 600; color: var(--ink); }
+
+/* OVERLAYS */
+#win-overlay, #mode-overlay, #lobby-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(17,17,17,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  z-index: 100; align-items: center; justify-content: center; flex-direction: column; gap: 16px; padding: 24px;
+}
+#win-overlay.show { display: flex; }
+#mode-overlay { display: flex; z-index: 200; }
+#mode-overlay.hidden { display: none; }
+#lobby-overlay { z-index: 200; }
+#lobby-overlay.show { display: flex; }
+
+.win-card, #mode-card, #lobby-card {
+  background: var(--surface); padding: 36px 40px; text-align: center;
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
+  animation: popIn 0.32s var(--ease); max-width: 360px; width: 100%;
+}
+@keyframes popIn {
+  from { transform: scale(0.94) translateY(8px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+.win-title { font-size: clamp(28px,8vw,36px); font-weight: 600; letter-spacing: 2px; line-height: 1; color: var(--ink); }
+.win-sub { margin-top: 10px; font-size: 12px; letter-spacing: 0.5px; color: var(--muted); }
+
+.win-btn, .mode-btn { padding: 13px 28px; border: none; background: var(--ink); color: #fff; font-family: inherit; font-size: 12px; font-weight: 500; letter-spacing: 0.6px; cursor: pointer; border-radius: var(--r-sm); transition: all 180ms var(--ease); }
+.win-btn:hover, .mode-btn:hover { background: var(--ink-soft); transform: translateY(-1px); }
+.win-btn:active, .mode-btn:active { transform: translateY(0); }
+
+#mode-card h2, #lobby-card h2 { font-size: 18px; font-weight: 600; letter-spacing: 0.3px; margin-bottom: 6px; color: var(--ink); }
+.mode-sub, .lobby-sub { font-size: 12px; color: var(--muted); margin-bottom: 22px; letter-spacing: 0.2px; }
+#mode-buttons { display: flex; flex-direction: column; gap: 8px; }
+.mode-btn { width: 100%; }
+.mode-btn.secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.mode-btn.secondary:hover { background: var(--line-soft); border-color: var(--ink-soft); }
+
+#ai-options { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+#ai-options-label { font-size: 10px; letter-spacing: 1.8px; color: var(--muted); text-transform: uppercase; font-weight: 500; margin-bottom: 10px; }
+#ai-options-row { display: flex; gap: 8px; }
+.ai-option-btn { flex: 1; padding: 10px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); font-family: inherit; font-weight: 500; font-size: 12px; border-radius: var(--r-sm); cursor: pointer; transition: all 180ms var(--ease); }
+.ai-option-btn:hover { border-color: var(--ink-soft); }
+.ai-option-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+/* LOBBY */
+#lobby-card { padding: 36px 32px; }
+#lobby-sections > div { display: none; }
+#lobby-sections > div.show { display: block; }
+.lobby-or { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 14px 0; }
+#lobby-code-input {
+  width: 100%; padding: 12px; border: 1.5px solid var(--line); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 22px; text-align: center; letter-spacing: 8px;
+  text-transform: uppercase; outline: none; background: var(--bg); color: var(--ink);
+  margin-bottom: 10px; transition: border-color 180ms;
+}
+#lobby-code-input:focus { border-color: var(--ink); }
+.room-code-big { font-size: 38px; font-weight: 700; letter-spacing: 10px; color: var(--ink); margin: 10px 0 18px; font-variant-numeric: tabular-nums; }
+.share-box { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 14px; font-size: 11px; color: var(--muted); word-break: break-all; text-align: left; cursor: pointer; margin-bottom: 14px; transition: border-color 180ms; }
+.share-box:hover { border-color: var(--ink-soft); }
+.waiting-line { font-size: 12px; color: var(--muted); }
+.dot-pulse::after { content: ''; animation: dots 1.4s infinite; }
+@keyframes dots { 0%{content:'.'} 33%{content:'..'} 66%{content:'...'} 100%{content:'.'} }
+.lobby-back { margin-top: 18px; width: 100%; }
+
+@media (max-width: 380px) {
+  header { padding: 22px 16px 14px; }
+  #scorebar, #status-wrap, #footer, #board-wrap { padding-left: 14px; padding-right: 14px; }
+  .win-card, #mode-card, #lobby-card { padding: 28px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- MODE SELECTOR -->
+<div id="mode-overlay">
+  <div id="mode-card">
+    <h2>New Game</h2>
+    <div class="mode-sub">Choose a mode to begin</div>
+    <div id="mode-buttons">
+      <button id="mode-pvp" class="mode-btn">2 Players — Local</button>
+      <button id="mode-online" class="mode-btn secondary">Online Multiplayer</button>
+      <button id="mode-pvc" class="mode-btn secondary">Play vs AI</button>
+    </div>
+    <div id="ai-options" style="display:none;">
+      <div id="ai-options-label">AI starts first?</div>
+      <div id="ai-options-row">
+        <button id="ai-first-no" class="ai-option-btn active">No</button>
+        <button id="ai-first-yes" class="ai-option-btn">Yes</button>
+      </div>
+      <button id="ai-start" class="mode-btn" style="margin-top:14px;">Start Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOBBY OVERLAY -->
+<div id="lobby-overlay">
+  <div id="lobby-card">
+    <h2>Online Multiplayer</h2>
+    <div id="lobby-sections">
+      <!-- Create/Join section -->
+      <div id="lobby-main" class="show">
+        <div class="lobby-sub">Play with a friend anywhere</div>
+        <button id="lobby-create-btn" class="mode-btn" style="margin-bottom:4px;">Create Game</button>
+        <div class="lobby-or">or join existing</div>
+        <input id="lobby-code-input" type="text" placeholder="XXXXXX" maxlength="6" autocomplete="off" spellcheck="false"/>
+        <button id="lobby-join-btn" class="mode-btn secondary">Join Game</button>
+      </div>
+      <!-- Waiting section -->
+      <div id="lobby-waiting">
+        <div class="lobby-sub">Share this code with your opponent</div>
+        <div class="room-code-big" id="lobby-room-code">------</div>
+        <div class="share-box" id="lobby-share-box">—</div>
+        <button id="lobby-copy-btn" class="mode-btn secondary" style="margin-bottom:14px;">Copy Link</button>
+        <div class="waiting-line"><span class="dot-pulse">Waiting for opponent</span></div>
+      </div>
+      <!-- Joining section -->
+      <div id="lobby-joining">
+        <div class="lobby-sub" style="margin-top:16px;">Connecting<span class="dot-pulse"></span></div>
+      </div>
+    </div>
+    <button id="lobby-back" class="btn lobby-back">Back</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">MATCH</div>
+  <div class="tagline">A Pairing Game</div>
+</header>
+
+<div id="scorebar">
+  <div class="scard active-p1" id="c1">
+    <div class="slabel">Player 1</div>
+    <div class="srow"><div class="ssymbol">X</div><div class="sval" id="s1">0</div></div>
+  </div>
+  <div class="scard" id="c2">
+    <div class="slabel">Player 2</div>
+    <div class="srow"><div class="ssymbol">O</div><div class="sval" id="s2">0</div></div>
+  </div>
+</div>
+
+<!-- Online indicator bar -->
+<div id="online-bar">
+  You are <strong>Player <span id="online-pnum">1</span></strong>
+  &nbsp;·&nbsp; Room <strong id="online-room">—</strong>
+  &nbsp;·&nbsp; <span id="online-turn-pill" class="turn-pill">Your turn</span>
+</div>
+
+<div id="status-wrap">
+  <div id="status">Player 1's turn</div>
+  <div id="hint">Place X on any cell — including the center</div>
+</div>
+
+<div id="board-wrap">
+  <div id="grid"></div>
+  <div id="center-btn-wrap">
+    <button id="center-btn" title="Center cell"></button>
+  </div>
+</div>
+
+<div id="footer">
+  <button id="reset" class="btn">New Game</button>
+  <button id="rules-toggle" class="btn">Rules</button>
+</div>
+
+<div id="rules-panel">
+  <h3>How to Play</h3>
+  <ul>
+    <li><strong>Player 1 = X · Player 2 = O.</strong> Players alternate turns.</li>
+    <li>Each turn, place your symbol in any cell — or on the <strong>center button</strong> — that doesn't already have it.</li>
+    <li>A cell is <strong>complete</strong> (yellow) when it has both X and O.</li>
+    <li>Win by completing <strong>4 in a row</strong> in any row, column, or diagonal.</li>
+    <li>The player who places the <strong>completing piece</strong> wins.</li>
+    <li><strong>Center cooldown:</strong> after placing on the center, the opponent must wait one turn.</li>
+    <li><strong>Diagonal bonus:</strong> when a diagonal has 3 complete cells and the 4th holds only the opponent's symbol, the center button glows — press it to complete the diagonal and win.</li>
+  </ul>
+</div>
+
+<div id="win-overlay">
+  <div class="win-card">
+    <div class="win-title" id="win-title">P1 Wins</div>
+    <div class="win-sub" id="win-sub">4 in a row completed</div>
+  </div>
+  <button class="win-btn" id="win-btn">Play Again</button>
+</div>
+
+<script>
+const DIAGS = [[0,5,10,15],[3,6,9,12]];
+const ALL_LINES = [
+  [0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15],
+  [0,4,8,12],[1,5,9,13],[2,6,10,14],[3,7,11,15],
+  [0,5,10,15],[3,6,9,12]
+];
+
+let cells, turn, scores, over, btnReady, btnTarget, btnAddKey, gameMode, centerCell,
+    aiGoesFirst=false, lastCell=null, aiMoveCount=0, centerLocked=false;
+
+// Online state
+let onlineMode = false, myPlayerNum = null, onlineRoomId = null;
+
+function init(mode='pvp', startAI=false){
+  cells = Array(16).fill(0).map(()=>({x:false,o:false}));
+  centerCell = {x:false,o:false};
+  aiGoesFirst = startAI;
+  turn = (mode==='pvc' && aiGoesFirst) ? 2 : 1;
+  scores = scores||[0,0]; over = false;
+  btnReady = false; btnTarget = null; btnAddKey = null;
+  gameMode = mode; lastCell = null; aiMoveCount = 0; centerLocked = false;
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('mode-overlay').classList.add('hidden');
+  setCenterBtn(false);
+  render(); updateUI();
+  if(gameMode==='pvc' && turn===2) setTimeout(aiMove, 600);
+}
+
+function complete(i){ return cells[i] && cells[i].x && cells[i].o; }
+function centerComplete(){ return centerCell.x && centerCell.o; }
+function myKey(p){ return p===1?'x':'o'; }
+function oppKey(p){ return p===1?'o':'x'; }
+function canPlace(i){ if(over||complete(i)) return false; return !cells[i][myKey(turn)]; }
+function canPressCenterPlacement(){ if(over) return false; if(centerCell[myKey(turn)]) return false; if(centerLocked) return false; return true; }
+
+function checkBtn(){
+  const my=myKey(turn), opp=oppKey(turn);
+  for(const d of DIAGS){
+    const done=d.filter(i=>complete(i)).length;
+    if(done!==3) continue;
+    const fourth=d.find(i=>!complete(i));
+    if(fourth===undefined) continue;
+    if(cells[fourth][opp]&&!cells[fourth][my]) return {target:fourth,addKey:my};
+    if(centerComplete()&&cells[fourth][my]&&!cells[fourth][opp]) return {target:fourth,addKey:opp};
+  }
+  return null;
+}
+
+function setCenterBtn(ready,target=null,addKey=null){ btnReady=ready; btnTarget=target; btnAddKey=addKey; }
+
+function endTurn(wasCenterPlacement){
+  centerLocked=!!wasCenterPlacement;
+  turn=turn===1?2:1;
+  render(); updateUI();
+  if(gameMode==='pvc'&&turn===2&&!over) setTimeout(aiMove,600);
+}
+
+function place(i){
+  if(onlineMode){ socket.emit('make-move',{cellIndex:i}); return; }
+  if(over) return;
+  if(btnReady){ setCenterBtn(false); btnTarget=null; lastCell=i; endTurn(false); return; }
+  if(!canPlace(i)) return;
+  cells[i][myKey(turn)]=true; lastCell=i; setCenterBtn(false);
+  if(complete(i)){ const wl=winLine(); if(wl){doWin(wl);return;} if(boardComplete()){doDraw();return;} }
+  const wlC=winLine(); if(wlC){doWin(wlC);return;}
+  const t=checkBtn();
+  if(t!=null){ setCenterBtn(true,t.target,t.addKey); render(); document.getElementById('hint').textContent='Bonus available — press the center to complete the diagonal, or tap any cell to skip'; return; }
+  endTurn(false);
+}
+
+function pressCenter(){
+  if(onlineMode){ socket.emit('press-center'); return; }
+  if(over) return;
+  if(btnReady&&btnTarget!==null){
+    const key=btnAddKey||myKey(turn);
+    cells[btnTarget][key]=true; lastCell=btnTarget; setCenterBtn(false); render();
+    if(complete(btnTarget)){ const wl=winLine(); if(wl){doWin(wl);return;} }
+    endTurn(false); return;
+  }
+  if(!canPressCenterPlacement()) return;
+  centerCell[myKey(turn)]=true; lastCell=-1; render();
+  const wl=winLine(); if(wl){doWin(wl);return;}
+  endTurn(true);
+}
+
+function boardComplete(){ return cells.every((_,j)=>complete(j)); }
+function winLine(){ for(const l of ALL_LINES) if(l.every(i=>complete(i))) return l; return null; }
+
+function doWin(line){
+  scores[turn-1]++;
+  over=true; render(); highlight(line);
+  setTimeout(()=>{
+    document.getElementById('win-title').textContent='Player '+turn+' Wins';
+    document.getElementById('win-sub').textContent=(turn===1?'X':'O')+' completes 4 in a row';
+    document.getElementById('win-overlay').classList.add('show');
+  },420);
+  document.getElementById('status').textContent='Player '+turn+' wins';
+  document.getElementById('hint').textContent='';
+  document.getElementById('c1').className='scard'; document.getElementById('c2').className='scard';
+  document.getElementById('s1').textContent=scores[0]; document.getElementById('s2').textContent=scores[1];
+  setCenterBtn(false);
+}
+
+function doDraw(){
+  over=true; render();
+  document.getElementById('status').textContent='Draw';
+  document.getElementById('hint').textContent='Board full — no winner';
+  setCenterBtn(false);
+}
+
+/* ---- AI ---- */
+function wouldAllowOpponentWin(pos){ cells[pos].o=true; for(let m=0;m<16;m++){ if(cells[m].x||complete(m))continue; cells[m].x=true; let w=false; for(const l of ALL_LINES){if(l.every(i=>complete(i))){w=true;break;}} cells[m].x=false; if(w){cells[pos].o=false;return true;} } cells[pos].o=false; return false; }
+function wouldMoveResultInWin(pos){ cells[pos].o=true; let w=false; for(const l of ALL_LINES){if(l.every(i=>complete(i))){w=true;break;}} cells[pos].o=false; return w; }
+function evaluateBoard(){ let s=0; const my=myKey(2),opp=myKey(1); for(const l of ALL_LINES){ const c=l.filter(j=>complete(j)).length,hM=l.filter(j=>cells[j][my]).length,hO=l.filter(j=>cells[j][opp]).length; if(c===3)s+=50; if(hM===3&&c<=2)s+=20; if(hO===3&&c<=2)s+=25; if(c===2)s+=10; if(hM===2)s+=5; } return s; }
+function scorePosition(i){ if(wouldMoveResultInWin(i))return 10000; if(wouldAllowOpponentWin(i))return -1000; cells[i].o=true; let b=Infinity; for(let m=0;m<16;m++){ if(!canPlace(m)||cells[m].x)continue; cells[m].x=true; const sc=evaluateBoard(); cells[m].x=false; if(sc<b)b=sc; } const fs=b<Infinity?b:evaluateBoard(); cells[i].o=false; let im=0; const my=myKey(2); for(const l of ALL_LINES){if(!l.includes(i))continue; if(l.filter(j=>cells[j][my]).length===2)im+=3;} return fs+im; }
+function aiMove(){
+  if(over||gameMode!=='pvc'||turn!==2)return;
+  if(btnReady){pressCenter();aiMoveCount++;return;}
+  let bM=-1,bS=-Infinity;
+  for(let i=0;i<16;i++){if(!canPlace(i))continue;const s=scorePosition(i);if(s>bS){bS=s;bM=i;}}
+  if(bS<0&&canPressCenterPlacement()){pressCenter();aiMoveCount++;return;}
+  if(bM===-1){for(let i=0;i<16;i++){if(canPlace(i)){bM=i;break;}}}
+  if(bM!==-1){place(bM);aiMoveCount++;if(btnReady&&!over)pressCenter();}
+}
+
+/* ---- Rendering ---- */
+function cellSVG(i,size){
+  const c=cells[i],cx=size/2,cy=size/2,arm=size*0.22,sw=size*0.075;
+  let inner='';
+  if(c.x) inner+=`<line x1="${cx-arm}" y1="${cy-arm}" x2="${cx+arm}" y2="${cy+arm}" stroke="#ef4444" stroke-width="${sw}" stroke-linecap="round"/><line x1="${cx+arm}" y1="${cy-arm}" x2="${cx-arm}" y2="${cy+arm}" stroke="#ef4444" stroke-width="${sw}" stroke-linecap="round"/>`;
+  if(c.o) inner+=`<circle cx="${cx}" cy="${cy}" r="${size*0.22}" fill="none" stroke="#0d9488" stroke-width="${sw}"/>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${inner}</svg>`;
+}
+function centerBtnSVG(size){
+  const cx=size/2,cy=size/2,arm=size*0.22,sw=size*0.085;
+  let inner='';
+  if(btnReady){ inner+=`<line x1="${cx-arm}" y1="${cy-arm}" x2="${cx+arm}" y2="${cy+arm}" stroke="#fff" stroke-width="${sw*0.95}" stroke-linecap="round"/><line x1="${cx+arm}" y1="${cy-arm}" x2="${cx-arm}" y2="${cy+arm}" stroke="#fff" stroke-width="${sw*0.95}" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="${size*0.10}" fill="#fff"/>`; }
+  else if(centerCell.x&&centerCell.o){ inner+=`<line x1="${cx-arm}" y1="${cy-arm}" x2="${cx+arm}" y2="${cy+arm}" stroke="#ef4444" stroke-width="${sw}" stroke-linecap="round"/><line x1="${cx+arm}" y1="${cy-arm}" x2="${cx-arm}" y2="${cy+arm}" stroke="#ef4444" stroke-width="${sw}" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="${size*0.30}" fill="none" stroke="#0d9488" stroke-width="${sw}"/>`; }
+  else if(centerCell.x){ const a=size*0.26,w=size*0.09; inner+=`<line x1="${cx-a}" y1="${cy-a}" x2="${cx+a}" y2="${cy+a}" stroke="#ef4444" stroke-width="${w}" stroke-linecap="round"/><line x1="${cx+a}" y1="${cy-a}" x2="${cx-a}" y2="${cy+a}" stroke="#ef4444" stroke-width="${w}" stroke-linecap="round"/>`; }
+  else if(centerCell.o){ inner+=`<circle cx="${cx}" cy="${cy}" r="${size*0.26}" fill="none" stroke="#0d9488" stroke-width="${size*0.09}"/>`; }
+  else { inner+=`<circle cx="${cx}" cy="${cy}" r="${size*0.13}" fill="currentColor"/>`; }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${inner}</svg>`;
+}
+
+function render(){
+  const grid=document.getElementById('grid');
+  const cellPx=Math.floor((Math.min(460,window.innerWidth)-40-20)/4);
+  grid.innerHTML='';
+  const isMyTurn = !onlineMode || (turn === myPlayerNum);
+  cells.forEach((c,i)=>{
+    const d=document.createElement('div');
+    const ok=canPlace(i)&&isMyTurn;
+    const comp=complete(i);
+    const showBlocked=!btnReady&&!over&&!comp&&(!isMyTurn||!canPlace(i));
+    d.className='cell'+(comp?' done':'')+(showBlocked?' blocked':'')+(i===btnTarget?' btn-target':'');
+    d.innerHTML=cellSVG(i,cellPx*0.66);
+    d.dataset.i=i;
+    if(!over){
+      if(btnReady&&isMyTurn){ d.addEventListener('click',()=>place(i)); }
+      else if(!comp&&ok){ d.addEventListener('click',()=>place(i)); }
+    }
+    grid.appendChild(d);
+  });
+  const centerBtn=document.getElementById('center-btn');
+  const cls=[];
+  if(btnReady&&btnTarget!==null) cls.push('ready');
+  if(centerComplete()) cls.push('done');
+  if(!btnReady&&!centerComplete()&&!over){ if(centerLocked&&!centerCell[myKey(turn)]) cls.push('locked'); }
+  centerBtn.className=cls.join(' ');
+  const isMyTurnCenter=!onlineMode||(turn===myPlayerNum);
+  let canClick=false;
+  if(!over){ if(btnReady&&btnTarget!==null&&isMyTurnCenter) canClick=true; else if(canPressCenterPlacement()&&isMyTurnCenter) canClick=true; }
+  centerBtn.disabled=!canClick;
+  const btnPx=Math.max(44,Math.min(54,Math.floor(cellPx*0.62)));
+  centerBtn.innerHTML=centerBtnSVG(btnPx*0.7);
+}
+
+function highlight(line){
+  setTimeout(()=>{ document.querySelectorAll('.cell').forEach(d=>{ if(line.includes(+d.dataset.i)) d.classList.add('win-cell'); }); },50);
+}
+
+function updateUI(){
+  if(over) return;
+  const sym=turn===1?'X':'O';
+  document.getElementById('status').textContent="Player "+turn+"'s turn";
+  let hint='Place '+sym+' on any cell or the center';
+  if(centerLocked&&!centerCell[myKey(turn)]) hint+=' (center locked this turn)';
+  document.getElementById('hint').textContent=hint;
+  document.getElementById('c1').className='scard'+(turn===1?' active-p1':'');
+  document.getElementById('c2').className='scard'+(turn===2?' active-p2':'');
+  document.getElementById('s1').textContent=scores[0];
+  document.getElementById('s2').textContent=scores[1];
+  if(onlineMode) updateOnlinePill();
+}
+
+function showModeSelector(){
+  document.getElementById('ai-options').style.display='none';
+  document.getElementById('mode-overlay').classList.remove('hidden');
+}
+function closeModeSelector(){ document.getElementById('mode-overlay').classList.add('hidden'); }
+
+/* ===================== ONLINE MULTIPLAYER ===================== */
+
+function applyServerState(state){
+  cells=state.cells; centerCell=state.centerCell; turn=state.turn; over=state.over;
+  btnReady=state.btnReady; btnTarget=state.btnTarget; btnAddKey=state.btnAddKey;
+  centerLocked=state.centerLocked; scores=state.scores;
+  render();
+  if(state.status==='win'){
+    highlight(state.winningLine);
+    setTimeout(()=>{
+      document.getElementById('win-title').textContent='Player '+state.winner+' Wins';
+      document.getElementById('win-sub').textContent=(state.winner===1?'X':'O')+' completes 4 in a row';
+      document.getElementById('win-overlay').classList.add('show');
+    },420);
+    document.getElementById('status').textContent='Player '+state.winner+' wins';
+    document.getElementById('hint').textContent='';
+    document.getElementById('c1').className='scard';
+    document.getElementById('c2').className='scard';
+  } else if(state.status==='draw'){
+    document.getElementById('status').textContent='Draw';
+    document.getElementById('hint').textContent='Board full — no winner';
+  } else {
+    updateUI();
+    if(state.btnReady) document.getElementById('hint').textContent='Bonus available — press the center to complete the diagonal, or tap any cell to skip';
+  }
+  document.getElementById('s1').textContent=scores[0];
+  document.getElementById('s2').textContent=scores[1];
+}
+
+function updateOnlinePill(){
+  const pill=document.getElementById('online-turn-pill');
+  const isMyTurn=turn===myPlayerNum;
+  pill.textContent=isMyTurn?'Your turn':'Waiting…';
+  pill.classList.toggle('waiting',!isMyTurn);
+}
+
+function showOnlineBar(){
+  document.getElementById('online-bar').classList.add('show');
+  document.getElementById('online-pnum').textContent=myPlayerNum;
+  document.getElementById('online-room').textContent=onlineRoomId;
+  updateOnlinePill();
+}
+
+function showLobbySection(id){
+  document.querySelectorAll('#lobby-sections > div').forEach(d=>d.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+}
+
+function showLobby(){
+  document.getElementById('lobby-overlay').classList.add('show');
+  showLobbySection('lobby-main');
+  document.getElementById('lobby-code-input').value='';
+}
+
+function hideLobby(){ document.getElementById('lobby-overlay').classList.remove('show'); }
+
+function startOnlineGame(pNum, roomId){
+  onlineMode=true; myPlayerNum=pNum; onlineRoomId=roomId;
+  gameMode='online'; scores=[0,0];
+  hideLobby();
+  closeModeSelector();
+  document.getElementById('online-bar').classList.add('show');
+  document.getElementById('online-pnum').textContent=pNum;
+  document.getElementById('online-room').textContent=roomId;
+}
+
+function attemptJoinRoom(roomId){
+  showLobbySection('lobby-joining');
+  socket.emit('join-room',{roomId},(resp)=>{
+    if(resp.error){ alert('Could not join: '+resp.error); showLobbySection('lobby-main'); }
+  });
+}
+
+// Socket setup
+const socket = io();
+
+socket.on('game-start',({state})=>{
+  startOnlineGame(myPlayerNum, onlineRoomId);
+  applyServerState(state);
+});
+
+socket.on('state-update',({state})=>{
+  applyServerState(state);
+});
+
+socket.on('opponent-left',()=>{
+  alert('Your opponent disconnected.');
+  onlineMode=false; myPlayerNum=null; onlineRoomId=null;
+  document.getElementById('online-bar').classList.remove('show');
+  scores=[0,0];
+  showModeSelector();
+});
+
+/* Lobby buttons */
+document.getElementById('mode-online').addEventListener('click',()=>{
+  closeModeSelector();
+  showLobby();
+});
+
+document.getElementById('lobby-create-btn').addEventListener('click',()=>{
+  socket.emit('create-room',(resp)=>{
+    onlineRoomId=resp.roomId; myPlayerNum=1;
+    showLobbySection('lobby-waiting');
+    document.getElementById('lobby-room-code').textContent=resp.roomId;
+    const url=window.location.origin+'?room='+resp.roomId;
+    document.getElementById('lobby-share-box').textContent=url;
+    document.getElementById('lobby-share-box').dataset.url=url;
+  });
+});
+
+document.getElementById('lobby-join-btn').addEventListener('click',()=>{
+  const code=document.getElementById('lobby-code-input').value.trim().toUpperCase();
+  if(code.length!==6){alert('Enter the 6-character room code');return;}
+  onlineRoomId=code; myPlayerNum=2;
+  attemptJoinRoom(code);
+});
+
+document.getElementById('lobby-copy-btn').addEventListener('click',()=>{
+  const url=document.getElementById('lobby-share-box').dataset.url;
+  if(url) navigator.clipboard.writeText(url).then(()=>{
+    document.getElementById('lobby-copy-btn').textContent='Copied!';
+    setTimeout(()=>document.getElementById('lobby-copy-btn').textContent='Copy Link',2000);
+  });
+});
+
+document.getElementById('lobby-back').addEventListener('click',()=>{
+  hideLobby(); showModeSelector();
+});
+
+/* Standard buttons */
+document.getElementById('center-btn').addEventListener('click',pressCenter);
+document.getElementById('reset').addEventListener('click',()=>{
+  if(onlineMode){ onlineMode=false; myPlayerNum=null; onlineRoomId=null; document.getElementById('online-bar').classList.remove('show'); }
+  scores=[0,0]; showModeSelector();
+});
+document.getElementById('win-btn').addEventListener('click',()=>{
+  if(onlineMode){ document.getElementById('win-overlay').classList.remove('show'); socket.emit('play-again'); }
+  else showModeSelector();
+});
+document.getElementById('mode-pvp').addEventListener('click',()=>{ document.getElementById('ai-options').style.display='none'; scores=[0,0]; init('pvp'); });
+document.getElementById('mode-pvc').addEventListener('click',()=>{ document.getElementById('ai-options').style.display='block'; });
+document.getElementById('ai-first-yes').addEventListener('click',()=>{ document.getElementById('ai-first-yes').classList.add('active'); document.getElementById('ai-first-no').classList.remove('active'); aiGoesFirst=true; });
+document.getElementById('ai-first-no').addEventListener('click',()=>{ document.getElementById('ai-first-no').classList.add('active'); document.getElementById('ai-first-yes').classList.remove('active'); aiGoesFirst=false; });
+document.getElementById('ai-start').addEventListener('click',()=>{ scores=[0,0]; init('pvc',aiGoesFirst); });
+document.getElementById('rules-toggle').addEventListener('click',()=>{
+  const p=document.getElementById('rules-panel');
+  p.classList.toggle('open');
+  document.getElementById('rules-toggle').textContent=p.classList.contains('open')?'Hide':'Rules';
+});
+window.addEventListener('resize',()=>{if(!over)render();});
+document.getElementById('mode-overlay').addEventListener('click',(e)=>{ if(e.target.id==='mode-overlay') closeModeSelector(); });
+window.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    if(!document.getElementById('mode-overlay').classList.contains('hidden')) closeModeSelector();
+    else if(document.getElementById('win-overlay').classList.contains('show')) document.getElementById('win-overlay').classList.remove('show');
+  }
+});
+
+// Auto-join from URL
+const _urlRoom = new URLSearchParams(window.location.search).get('room');
+if(_urlRoom){
+  myPlayerNum=2; onlineRoomId=_urlRoom.toUpperCase();
+  document.getElementById('lobby-overlay').classList.add('show');
+  showLobbySection('lobby-joining');
+  if(socket.connected){ attemptJoinRoom(onlineRoomId); }
+  else { socket.once('connect',()=>attemptJoinRoom(onlineRoomId)); }
+} else {
+  showModeSelector();
+}
+</script>
+</body>
+</html>
