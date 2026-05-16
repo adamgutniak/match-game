@@ -90,9 +90,7 @@ function applyPressCenter(state) {
     const key = btnAddKey || myKey(turn);
     cells[btnTarget][key] = true;
     state.btnReady = false; state.btnTarget = null; state.btnAddKey = null;
-    if (complete(cells, btnTarget)) {
-      const wl = winLine(cells); if (wl) { doWin(state, wl); return true; }
-    }
+    const wl = winLine(cells); if (wl) { doWin(state, wl); return true; }
     endTurn(state, false); return true;
   }
   if (centerCell[myKey(turn)] || centerLocked) return false;
