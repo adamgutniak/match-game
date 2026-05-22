@@ -81,6 +81,7 @@ header { width: 100%; max-width: 460px; padding: 32px 20px 18px; text-align: cen
 #center-btn.done { background: var(--complete); border-color: var(--complete-line); cursor: default; opacity: 1; }
 #center-btn.locked { border-style: dashed; border-color: var(--muted); opacity: 0.45; cursor: not-allowed; }
 #center-btn.ready { background: var(--win); border-color: var(--win); color: #fff; box-shadow: 0 0 0 4px var(--bg), 0 4px 14px rgba(251,191,36,0.45); animation: gentlePulse 1.6s ease-in-out infinite; opacity: 1; }
+#center-btn.win { background: var(--win) !important; border-color: rgba(180,120,0,0.3) !important; opacity: 1; cursor: default; }
 @keyframes gentlePulse {
   0%,100% { box-shadow: 0 0 0 4px var(--bg), 0 4px 14px rgba(251,191,36,0.45); }
   50%      { box-shadow: 0 0 0 4px var(--bg), 0 4px 22px rgba(251,191,36,0.65); }
@@ -291,7 +292,7 @@ const ALL_LINES = [
   [0,5,10,15],[3,6,9,12]
 ];
 
-let cells, turn, scores, over, btnReady, btnTarget, btnAddKey, gameMode, centerCell,
+let cells, turn, scores, over, won, btnReady, btnTarget, btnAddKey, gameMode, centerCell,
     aiGoesFirst=false, lastCell=null, aiMoveCount=0, centerLocked=false;
 
 // Online state
@@ -302,7 +303,7 @@ function init(mode='pvp', startAI=false){
   centerCell = {x:false,o:false};
   aiGoesFirst = startAI;
   turn = (mode==='pvc' && aiGoesFirst) ? 2 : 1;
-  scores = scores||[0,0]; over = false;
+  scores = scores||[0,0]; over = false; won = false;
   btnReady = false; btnTarget = null; btnAddKey = null;
   gameMode = mode; lastCell = null; aiMoveCount = 0; centerLocked = false;
   document.getElementById('win-overlay').classList.remove('show');
@@ -374,7 +375,7 @@ function boardComplete(){ return cells.every((_,j)=>complete(j)); }
 function winLine(){ for(const l of ALL_LINES) if(l.every(i=>complete(i))) return l; return null; }
 
 function doWin(line){
-  scores[turn-1]++;
+  won=true; scores[turn-1]++;
   over=true; render(); highlight(line);
   setTimeout(()=>{
     document.getElementById('win-title').textContent='Player '+turn+' Wins';
@@ -450,9 +451,10 @@ function render(){
   });
   const centerBtn=document.getElementById('center-btn');
   const cls=[];
-  if(btnReady&&btnTarget!==null) cls.push('ready');
-  if(centerComplete()) cls.push('done');
-  if(!btnReady&&!centerComplete()&&!over){ if(centerLocked&&!centerCell[myKey(turn)]) cls.push('locked'); }
+  if(won) cls.push('win');
+  else if(btnReady&&btnTarget!==null) cls.push('ready');
+  else if(centerComplete()) cls.push('done');
+  else if(!centerComplete()&&!over){ if(centerLocked&&!centerCell[myKey(turn)]) cls.push('locked'); }
   centerBtn.className=cls.join(' ');
   const isMyTurnCenter=!onlineMode||(turn===myPlayerNum);
   let canClick=false;
@@ -490,6 +492,7 @@ function closeModeSelector(){ document.getElementById('mode-overlay').classList.
 
 function applyServerState(state){
   cells=state.cells; centerCell=state.centerCell; turn=state.turn; over=state.over;
+  won=state.status==='win';
   btnReady=state.btnReady; btnTarget=state.btnTarget; btnAddKey=state.btnAddKey;
   centerLocked=state.centerLocked; scores=state.scores;
   render();
