@@ -359,8 +359,9 @@ function pressCenter(){
   if(over) return;
   if(btnReady&&btnTarget!==null){
     const key=btnAddKey||myKey(turn);
-    cells[btnTarget][key]=true; lastCell=btnTarget; setCenterBtn(false); render();
-    if(complete(btnTarget)){ const wl=winLine(); if(wl){doWin(wl);return;} }
+    const target=btnTarget;
+    cells[target][key]=true; lastCell=target; setCenterBtn(false); render();
+    if(complete(target)){ const wl=winLine(); if(wl){doWin(wl);return;} }
     endTurn(false); return;
   }
   if(!canPressCenterPlacement()) return;
