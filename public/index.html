@@ -449,7 +449,8 @@ function render(){
     }
     grid.appendChild(d);
   });
-  const centerBtn=document.getElementById('center-btn');
+  if(won&&centerComplete()) cls.push('win');
+
   const cls=[];
   if(won) cls.push('win');
   else if(btnReady&&btnTarget!==null) cls.push('ready');
