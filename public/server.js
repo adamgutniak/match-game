@@ -36,6 +36,7 @@ function checkBtn({ cells, centerCell, turn }) {
     if (done !== 3) continue;
     const fourth = d.find(i => !complete(cells, i));
     if (fourth === undefined) continue;
+    if (ccDone(centerCell) && cells[fourth][opp] && !cells[fourth][my]) return { target: fourth, addKey: my };
     if (cells[fourth][opp] && !cells[fourth][my]) return { target: fourth, addKey: my };
     if (ccDone(centerCell) && cells[fourth][my] && !cells[fourth][opp])
       return { target: fourth, addKey: opp };
