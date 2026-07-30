@@ -351,6 +351,8 @@ function place(i){
   if(complete(i)){ const wl=winLine(); if(wl){doWin(wl);return;} if(boardComplete()){doDraw();return;} }
   const wlC=winLine(); if(wlC){doWin(wlC);return;}
   const t=checkBtn();
+  if(centerComplete()&&cells[fourth][opp]&&!cells[fourth][my]) return {target:fourth,addKey:my};
+
   if(t!=null){ setCenterBtn(true,t.target,t.addKey); render(); document.getElementById('hint').textContent='Bonus available — press the center to complete the diagonal, or tap any cell to skip'; return; }
   endTurn(false);
 }
@@ -449,7 +451,7 @@ function render(){
     }
     grid.appendChild(d);
   });
-  if(won&&centerComplete()) cls.push('win');
+  const centerBtn=document.getElementById('center-btn');
 
   const cls=[];
   if(won) cls.push('win');
