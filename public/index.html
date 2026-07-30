@@ -321,17 +321,23 @@ function canPlace(i){ if(over||complete(i)) return false; return !cells[i][myKey
 function canPressCenterPlacement(){ if(over) return false; if(centerCell[myKey(turn)]) return false; if(centerLocked) return false; return true; }
 
 function checkBtn(){
-  const my=myKey(turn), opp=oppKey(turn);
+  // The center button must have BOTH X and O placed on it first
+  if(!centerComplete()) return null;
+
+  const my = myKey(turn), opp = oppKey(turn);
   for(const d of DIAGS){
-    const done=d.filter(i=>complete(i)).length;
-    if(done!==3) continue;
-    const fourth=d.find(i=>!complete(i));
-    if(fourth===undefined) continue;
-    if(cells[fourth][opp]&&!cells[fourth][my]) return {target:fourth,addKey:my};
-    if(centerComplete()&&cells[fourth][my]&&!cells[fourth][opp]) return {target:fourth,addKey:opp};
+    const done = d.filter(i => complete(i)).length;
+    if(done !== 3) continue;
+    const fourth = d.find(i => !complete(i));
+    if(fourth === undefined) continue;
+    
+    // Trigger bonus target when center is complete and the diagonal condition is met
+    if(cells[fourth][opp] && !cells[fourth][my]) return {target: fourth, addKey: my};
+    if(cells[fourth][my] && !cells[fourth][opp]) return {target: fourth, addKey: opp};
   }
   return null;
 }
+
 
 function setCenterBtn(ready,target=null,addKey=null){ btnReady=ready; btnTarget=target; btnAddKey=addKey; }
 
